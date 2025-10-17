@@ -114,7 +114,7 @@ export default function Dashboard() {
     }
   }, [])
 
-  // Fetch logs from /logs endpoint
+  // Fetch logs from / slogs endpoint
   const fetchLogs = async () => {
     try {
       const response = await api.getHistoricalLogs(logLimit, 0)
