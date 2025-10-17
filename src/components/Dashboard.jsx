@@ -7,7 +7,6 @@ import { Chart, LineController, LineElement, PointElement, LinearScale, Category
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Legend, Tooltip)
 
 export default function Dashboard() {
-  // CHANGED: Remove the baseUrl parameter to use default '/api'
   const api = useMemo(() => new WAFDashboardAPI(), [])
 
   const [benignCount, setBenign] = useState(0)
@@ -25,18 +24,42 @@ export default function Dashboard() {
   const chartInstanceRef = useRef(null)
   const pollingIntervalRef = useRef(null)
 
-  // Helper function to convert UTC to IST
+  // FIXED: Proper UTC to IST conversion
   const convertToIST = (utcDateString) => {
-    const date = new Date(utcDateString)
-    const istOffset = 5.5 * 60 * 60 * 1000
-    const istDate = new Date(date.getTime() + istOffset)
+    if (!utcDateString) return new Date()
+    
+    // Parse the UTC timestamp
+    const utcDate = new Date(utcDateString)
+    
+    // Convert to IST by using toLocaleString with IST timezone
+    const istDate = new Date(utcDate.toLocaleString('en-US', { 
+      timeZone: 'Asia/Kolkata' 
+    }))
+    
     return istDate
   }
 
-  // Format time in IST
+  // FIXED: Format time in IST
   const formatISTTime = (utcDateString) => {
-    const istDate = convertToIST(utcDateString)
-    return istDate.toLocaleTimeString('en-IN', { 
+    if (!utcDateString) return '--:--:--'
+    
+    const utcDate = new Date(utcDateString)
+    
+    // Directly format in IST timezone
+    return utcDate.toLocaleString('en-IN', { 
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit',
+      hour12: true 
+    })
+  }
+
+  // FIXED: Get current IST time
+  const getCurrentISTTime = () => {
+    const now = new Date()
+    return now.toLocaleString('en-IN', { 
+      timeZone: 'Asia/Kolkata',
       hour: '2-digit', 
       minute: '2-digit', 
       second: '2-digit',
@@ -132,10 +155,21 @@ export default function Dashboard() {
         // Update chart
         const chart = chartInstanceRef.current
         if (chart) {
+          // FIXED: Better time sorting
           const sortedTimes = Object.keys(timeGroups).sort((a, b) => {
-            const timeA = new Date('1970-01-01 ' + a.replace(/AM|PM/, '').trim())
-            const timeB = new Date('1970-01-01 ' + b.replace(/AM|PM/, '').trim())
-            return timeA - timeB
+            // Parse the time strings properly
+            const parseTime = (timeStr) => {
+              const [time, period] = timeStr.split(' ')
+              const [hours, minutes, seconds] = time.split(':').map(Number)
+              let hour24 = hours
+              
+              if (period === 'PM' && hours !== 12) hour24 += 12
+              if (period === 'AM' && hours === 12) hour24 = 0
+              
+              return hour24 * 3600 + minutes * 60 + seconds
+            }
+            
+            return parseTime(a) - parseTime(b)
           })
           
           chart.data.labels = sortedTimes
@@ -155,12 +189,8 @@ export default function Dashboard() {
         }))
         setEvents(recentEvents)
         
-        setLastUpdated(new Date().toLocaleTimeString('en-IN', { 
-          hour: '2-digit', 
-          minute: '2-digit', 
-          second: '2-digit',
-          hour12: true 
-        }))
+        // FIXED: Use IST time for last updated
+        setLastUpdated(getCurrentISTTime())
       } else {
         setConnected(false)
       }
